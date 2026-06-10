@@ -1,6 +1,6 @@
 {
-  "name": "Macher Kamera",
-  "short_name": "Kamera",
+  "name": "Avanta Smart Control",
+  "short_name": "Control",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
