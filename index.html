@@ -9,9 +9,9 @@
     <link rel="manifest" href="manifest.json">
     <style>
         body { 
-            background: #d23a3a; 
+            background: #000000; 
             color: #ffffff; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             margin: 0; 
             display: flex; 
             align-items: center; 
@@ -20,41 +20,18 @@
             overflow: hidden; 
             text-align: center; 
         }
-        
-        #loaderContainer {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Apple iOS Spinner */
+        #loaderContainer { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .apple-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top-color: #007aff;
-            border-radius: 50%;
-            animation: rotateSpinner 0.8s linear infinite;
-            margin-bottom: 20px;
+            width: 40px; height: 40px; border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #007aff; border-radius: 50%; animation: rotateSpinner 0.8s linear infinite; margin-bottom: 20px;
         }
-
-        #statusMessage {
-            font-size: 16px;
-            color: #8e8e93;
-            font-weight: 500;
-        }
-
+        #statusMessage { font-size: 16px; color: #8e8e93; font-weight: 500; margin-bottom: 30px; }
+        .btn { padding: 14px 24px; background: #007aff; color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 16px; cursor: pointer; }
         .error-screen { animation: shake 0.4s ease-in-out; }
         .error-icon { font-size: 50px; color: #ff3b30; margin-bottom: 15px; }
         .error-title { font-size: 20px; font-weight: bold; color: #ff3b30; }
-
         @keyframes rotateSpinner { to { transform: rotate(360deg); } }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-8px); }
-            75% { transform: translateX(8px); }
-        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
     </style>
 </head>
 <body>
@@ -62,60 +39,69 @@
     <div id="loaderContainer">
         <div id="spinner" class="apple-spinner"></div>
         <div id="statusMessage">Verbinde mit PC-Netzwerk...</div>
+        <button class="btn" onclick="requestPushPermission()">🔔 1. Push erlauben</button>
     </div>
 
     <script>
-        // Registrierung des Hintergrund-Dienstes
         if ('serviceWorker' in navigator) { 
             navigator.serviceWorker.register('sw.js'); 
         }
 
-        // Die exakt gleiche anonyme API-Box wie im Python-Skript
+        // Der private Briefkasten im Netz
         const BOX_ID = "elias_kamera_sync_2026_secure_stream";
         const URL_SEND = `https://kvdb.io/MN86s74YvE4Y7gE47u14mR/${BOX_ID}`;
 
+        // Sobald die App öffnet, funkt sie den PC an
         window.addEventListener('DOMContentLoaded', async () => {
-            // 1. Dem PC signalisieren, dass die App offen ist und wartet
             document.getElementById('statusMessage').innerText = "Warte auf Freigabe am PC...";
             try {
+                // Das Signal wird in die Box geschrieben
                 await fetch(URL_SEND, { method: 'POST', body: 'ping' });
+                console.log("Ping erfolgreich gesendet!");
             } catch(e) {
-                document.getElementById('statusMessage').innerText = "Verbindungsfehler. Wiederhole...";
+                document.getElementById('statusMessage').innerText = "Verbindungsfehler zum PC.";
             }
 
-            // 2. Auf das verschlüsselte Push-Rücksignal vom Service Worker warten
+            // Auf Rücksignal vom PC warten
             navigator.serviceWorker.addEventListener('message', event => {
                 const packet = event.data;
-                
                 if (packet.status === 'allow') {
-                    // Der magische Moment: Überschreibe die leere Hülle mit dem echten Code vom PC
                     document.open();
-                    document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="UTF-8">
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-                            <style>${packet.css}</style>
-                        </head>
-                        <body>
-                            ${packet.html}
-                            <script>${packet.js}<\/script>
-                        </body>
-                        </html>
-                    `);
+                    document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><style>${packet.css}</style></head><body>${packet.html}<script>${packet.js}<\/script></body></html>`);
                     document.close();
                 } else {
-                    // Bann / Zugriff verweigert ausgeben
                     document.getElementById('loaderContainer').className = "error-screen";
-                    document.getElementById('loaderContainer').innerHTML = `
-                        <div class="error-icon">🔒</div>
-                        <div class="error-title">ZUGRIFF VERWEIGERT</div>
-                        <div style="color:#8e8e93; margin-top:8px; font-size:14px;">Anfrage am PC abgelehnt.</div>
-                    `;
+                    document.getElementById('loaderContainer').innerHTML = `<div class="error-icon">🔒</div><div class="error-title">ZUGRIFF VERWEIGERT</div>`;
                 }
             });
         });
+
+        function requestPushPermission() {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array('BDArFjX_dUCVI9iPDrud07Jc-zmuShZZrdAigTSpbBr6kPveCd98AHGU16kZXo0aHz9ms-TZltvzvUqLytU497w')
+                        }).then(sub => {
+                            alert("✅ Push aktiv! Starte die App jetzt neu.");
+                            window.location.reload();
+                        }).catch(err => alert("Fehler beim Abo: " + err));
+                    });
+                } else {
+                    alert("Berechtigung abgelehnt!");
+                }
+            });
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+            return outputArray;
+        }
     </script>
 </body>
 </html>
